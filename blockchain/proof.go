@@ -21,13 +21,14 @@ import (
 // Requirements:
 // The first few bytes must contain 0s
 
-const Difficulty = 13
+const Difficulty = 17
 
 type ProofOfWork struct {
 	Block  *Block
 	Target *big.Int
 }
 
+// NewProof basically creates a target and pairs it with a given block
 func NewProof(b *Block) *ProofOfWork {
 	target := big.NewInt(1)
 	target.Lsh(target, uint(256-Difficulty))
@@ -37,6 +38,10 @@ func NewProof(b *Block) *ProofOfWork {
 	return pow
 }
 
+//InitData (along with ToHex) will replace the old DeriveHash func
+//In DeriveHash: Hash derived from Data + PrevHash
+//In InitData + ToHex: Hash derived from Data, PrevHash, Nonce, Diff.
+//Nonce and Diff need to be cast in an int64 when calling ToHex on them
 func (pow *ProofOfWork) InitData(nonce int) []byte {
 	data := bytes.Join(
 		[][]byte{
@@ -48,6 +53,17 @@ func (pow *ProofOfWork) InitData(nonce int) []byte {
 	return data
 }
 
+//Run is the main computational method
+//It runs on the pow and outputs an int (nonce) and a slice of bytes (hash)
+//Basically create an infinite loop
+//Prep data using InitData
+//Hash it into a sha256 format - Printed out to see the process
+//Convert hash into big int
+//Compare pow target with new big int
+//If == -1, break out of loop (hash is less than target means block is signed)
+//Else, increment nonce, create new hash
+//Println for some space (outside loop)
+//Return the nonce and hash
 func (pow *ProofOfWork) Run() (int, []byte) {
 	var intHash big.Int
 	var hash [32]byte
@@ -56,7 +72,7 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 
 	for nonce < math.MaxInt64 {
 		data := pow.InitData(nonce)
-		hash := sha256.Sum256(data)
+		hash = sha256.Sum256(data)
 
 		fmt.Printf("`r%x", hash)
 		intHash.SetBytes(hash[:])
@@ -82,6 +98,7 @@ func (pow *ProofOfWork) Validate() bool {
 	return intHash.Cmp(pow.Target) == -1
 }
 
+//ToHex is a utility func that turns an int64 into a slice of bytes
 func ToHex(num int64) []byte {
 	buff := new(bytes.Buffer)
 	err := binary.Write(buff, binary.BigEndian, num)
