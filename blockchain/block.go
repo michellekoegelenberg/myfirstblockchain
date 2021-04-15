@@ -1,8 +1,10 @@
 package blockchain
 
-type BlockChain struct {
-	Blocks []*Block
-}
+import (
+	"bytes"
+	"encoding/gob"
+	"log"
+)
 
 //Modify Block to store nonce so validation func can be implemented
 type Block struct {
@@ -19,7 +21,7 @@ type Block struct {
 //Return the block
 //Now we can pass around data properly :)
 func CreateBlock(data string, prevHash []byte) *Block {
-	block := &Block{[]byte{}, []byte(data), prevHash, 0} //Block gets initjsvdjksvbd
+	block := &Block{[]byte{}, []byte(data), prevHash, 0} //Block gets init
 	pow := NewProof(block)                               //Init pow with NewProof allows us to pair a target with each new block that gets created
 	nonce, hash := pow.Run()
 
@@ -28,14 +30,20 @@ func CreateBlock(data string, prevHash []byte) *Block {
 
 	return block
 }
-func (chain *BlockChain) AddBlock(data string) {
-	prevBlock := chain.Blocks[len(chain.Blocks)-1]
-	new := CreateBlock(data, prevBlock.Hash)
-	chain.Blocks = append(chain.Blocks, new)
-}
+
 func Genesis() *Block {
 	return CreateBlock("Genesis", []byte{})
 }
-func InitBlockChain() *BlockChain {
-	return &BlockChain{[]*Block{Genesis()}}
+
+func (b *Block) Serialize() []byte {
+	var res bytes.Buffer
+	encoder := gob.NewEncoder(&res)
+
+	err := encoder.Encode(b)
+
+	if err != nil {
+		log.Panic(err)
+	}
+
+	return res.Bytes()
 }
