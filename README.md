@@ -1,9 +1,1 @@
-# My Blockchain project
-
-This is my blockchain project. Chapters will be reflected in different branches.
-
-Worship my greatness!
-
-# Acknowledgements
-
-Renier
+This is based on a YouTube Tutorial by Tensor Programming

@@ -22,7 +22,7 @@ func InitBlockChain() *BlockChain {
 
 	 //Could try this:   db, err := badger.Open(badger.DefaultOptions("/tmp/badger"))
 
-	db, err := badger.Open(opts)
+	db, err := badger.Open(opts) //Changed this in accordance with new BadgerDB API
 
 	Handle(err)
 
@@ -79,17 +79,18 @@ func (chain *BlockChain) AddBlock(data string) {
    //With our new block now created, we want to do a read/write type txn on our db
    //so we can put the new block into the database and assign the new block's hash to our last hash key
    err := chain.Database.Update(func(txn *badger.Txn) error) {
+	   //As we did with Genesis (use new block's hash as key and serialize newBlock itself and put that in as the value)
 	   err := txn.Set(newBlock.Hash, newBlock.Serialize())
 	   Handle(err)
+	   //Set newBlock's hash as last hash value
+	   err = txn.Set([]byte("lh"), newBlock.Hash)
+	   //Grab blockchain (chain) and lastHash field and set it equal to new block's hash
+	   chain.lastHash = newBlock.Hash
+	   return err
 
    }
-	
-	
-
-
-
-
-	prevBlock := chain.Blocks[len(chain.Blocks)-1]
-	new := CreateBlock(data, prevBlock.Hash)
-	chain.Blocks = append(chain.Blocks, new)
+	Handle(err)
+//Succesfully created a layer of persistence for our blockchain
+//However, lost the ability to go through our blockchain and print it out like we have before
+//All the blocks are in the data layer. Can't just print them out
 }
