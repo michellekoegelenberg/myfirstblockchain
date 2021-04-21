@@ -35,15 +35,36 @@ func Genesis() *Block {
 	return CreateBlock("Genesis", []byte{})
 }
 
+// The Serialize meth gives us a bytes representation of our block
+// Encode block into bytes
+
 func (b *Block) Serialize() []byte {
-	var res bytes.Buffer
-	encoder := gob.NewEncoder(&res)
+	var res bytes.Buffer //Create result (of type bytes.Buffer)
+	encoder := gob.NewEncoder(&res) //Create new encoder on results bytes buffer
 
-	err := encoder.Encode(b)
+	err := encoder.Encode(b) //Call 'Encode' on the block itself. Passes back an err. Need to do err handling
 
+	Handle(err) //Handle err func added later
+
+	return res.Bytes() // Return the bytes portion of our result. Gives us a bytes representation of our block
+}
+
+
+
+//Deserialize func is basically the opposite of serialize
+func Deserialize(data []byte) *Block {
+	var block Block
+	decoder := gob.NewDecoder(bytes.NewReader(data))
+
+	err := decoder.Decode(&block)
+
+	Handle(err)
+
+return &block
+}
+
+func Handle(err error) {
 	if err != nil {
 		log.Panic(err)
 	}
-
-	return res.Bytes()
 }
