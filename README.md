@@ -1,4 +1,4 @@
 # myfirstblockchain
 
-This repo is based on the YouTube Tutorial "Building a blockchain in Go" by Tensor programming.
+This repo is based on the YouTube Tutorial Series "Building a blockchain in Golang" by Tensor programming.
 
