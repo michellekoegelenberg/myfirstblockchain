@@ -42,11 +42,12 @@ func NewProof(b *Block) *ProofOfWork {
 //In DeriveHash: Hash derived from Data + PrevHash
 //In InitData + ToHex: Hash derived from Data, PrevHash, Nonce, Diff.
 //Nonce and Diff need to be cast in an int64 when calling ToHex on them
+//Chapter 4: Replace Data with HashTransactions
 func (pow *ProofOfWork) InitData(nonce int) []byte {
 	data := bytes.Join(
 		[][]byte{
 			pow.Block.PrevHash,
-			pow.Block.Data,
+			pow.Block.HashTransactions(), //After this go to blockgain.go file to add constants
 			ToHex(int64(nonce)),
 			ToHex(int64(Difficulty)),
 		}, []byte{})

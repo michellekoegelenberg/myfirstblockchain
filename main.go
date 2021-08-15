@@ -3,117 +3,155 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"runtime"
 	"strconv"
+
 	"github.com/michellekoegelenberg/myfirstblockchain/blockchain"
 )
 
-//Part 3 of Chapter 3:
-//Create CLI to allow user to pass in a new block and print out the blockchain
-//Step 1 is to create a CommandLine struct
-type CommandLine struct {
-	blockchain *blockchain.BlockChain
-}
+//Chapter 4: Simplify by removing the blockchain from the CLI struct
+type CommandLine struct{}
 
-//Add instructions for the user
-//method
-
+//Add to our print usage func (rem add block, add 3 new commands)
 func (cli *CommandLine) printUsage() {
 	fmt.Println("Usage:")
-	fmt.Println(" add -block BLOCK_DATA - add a block to the chain")
-	fmt.Println(" print – Prints the blocks in the chain")
+	fmt.Println(" getbalance -address ADDRESS - get the balance for an address")
+	fmt.Println(" createblockchain -address ADDRESS creates a blockchain and sends genesis reward to address")
+	fmt.Println(" printchain - Prints the blocks in the chain")
+	fmt.Println(" send -from FROM -to TO -amount AMOUNT - Send amount of coins")
 }
-
-//Create another method to validate arguments
 
 func (cli *CommandLine) validateArgs() {
- if len(os.Args) < 2 {
-	 cli.printUsage() //User hasn't entered in a command
-	 runtime.Goexit() //Exits app by shutting down the go-routine (badger needs to properly garbage collect values and keys before shutdown)
- }
+	if len(os.Args) < 2 {
+		cli.printUsage() //User hasn't entered in a command
+		runtime.Goexit() //Exits app by shutting down the go-routine (badger needs to properly garbage collect values and keys before shutdown)
+	}
 }
 
-//Create AddBlock meth for user
-
-func (cli *CommandLine) addBlock(data string) {
-	cli.blockchain.AddBlock(data) //Call to the bc inside our cli, call the AddBlock method on the data passed in from the cli
-	fmt.Println("Added block!")
-}
-
-//Add method to print out blockchain
+//Chap 4: Remove AddBlock
+//and add to Print Chain
 func (cli *CommandLine) printChain() {
-	iter := cli.blockchain.Iterator() //Access our iterator by calling cli.blockchain.Iterator() which converst bc struct to iter struct
-	//Create for loop and add print statements
+	chain := blockchain.ContinueBlockChain("")
+	defer chain.Database.Close()
+	iter := chain.Iterator()
+
 	for {
 		block := iter.Next()
 
-		//Cut out print statements from below (main func) and paste them here
-		fmt.Printf("Previous Hash: %x\n", block.PrevHash)
-		fmt.Printf("Data in Block: %s\n", block.Data)
+		fmt.Printf("Prev. hash: %x\n", block.PrevHash)
 		fmt.Printf("Hash: %x\n", block.Hash)
-
 		pow := blockchain.NewProof(block)
-		fmt.Printf("Pow: %s\n", strconv.FormatBool(pow.Validate())) //print string format by converting bool to string
+		fmt.Printf("PoW: %s\n", strconv.FormatBool(pow.Validate()))
 		fmt.Println()
 
-		if len(block.PrevHash) == 0 { //Genesis block doesn't have prevHash, so it will be zero
+		if len(block.PrevHash) == 0 {
 			break
 		}
 	}
 }
 
-//Create run method to call all other methods
-func (cli *CommandLine) run() {
-	cli.validateArgs()
-	//Create some flags for our cli tool to operate
-	addBlockCmd := flag.NewFlagSet("add", flag.ExitOnError)
-	printChainCmd := flag.NewFlagSet("print", flag.ExitOnError)
-	addBlockData := addBlockCmd.String("block", " ", "Block data") //Add subset to add block cmd (Adding '-block' will alow them to add data string)
+func (cli *CommandLine) createBlockChain(address string) {
+	chain := blockchain.InitBlockChain(address)
+	chain.Database.Close()
+	fmt.Println("Finished!")
+}
 
-	//Get the args by calling a switch statement. Call on fist arg after the original call to the program.
-	switch os.Args[1] {
-		case "add":
-			err := addBlockCmd.Parse(os.Args[2:]) //parse all the args that come after the first arg in our arg list
-			blockchain.Handle(err) //call to blockchain library and calling handle meth we created
+func (cli *CommandLine) getBalance(address string) {
+	chain := blockchain.ContinueBlockChain(address)
+	defer chain.Database.Close()
 
-		case "print":
-			err := printChainCmd.Parse(os.Args[2:]) //parse all the args that come after the first arg in our arg list
-			blockchain.Handle(err)
+	balance := 0
+	UTXOs := chain.FindUTXO(address)
 
-		default: 
-		cli.printUsage()
-		runtime.Goexit() //To gracefully shut down the channel and then the program
-	} 
-
-	//When we parse flags: If they don't give error, they will give bolean value 'true'
-	//Check this by calling parsed method on the flags
-
-	if addBlockCmd.Parsed() { //Check to see if parsed
-		if *addBlockData == "" { //Check to see if empty string
-			cli.printUsage()
-			runtime.Goexit()
-		}
-		cli.addBlock(*addBlockData) //If not empty take data and make new block in our bc
+	for _, out := range UTXOs {
+		balance += out.Value
 	}
 
-	if printChainCmd.Parsed() { //Check if parsed
-		cli.printChain()
+	fmt.Printf("Balance of %s: %d\n", address, balance)
+}
 
+func (cli *CommandLine) send(from, to string, amount int) {
+	chain := blockchain.ContinueBlockChain(from)
+	defer chain.Database.Close()
+
+	tx := blockchain.NewTransaction(from, to, amount, chain)
+	chain.AddBlock([]*blockchain.Transaction{tx})
+	fmt.Println("Success!")
+}
+
+func (cli *CommandLine) run() {
+	cli.validateArgs()
+	getBalanceCmd := flag.NewFlagSet("getbalance", flag.ExitOnError)
+	createBlockchainCmd := flag.NewFlagSet("createblockchain", flag.ExitOnError)
+	sendCmd := flag.NewFlagSet("send", flag.ExitOnError)
+	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
+
+	getBalanceAddress := getBalanceCmd.String("address", "", "The address to get balance for")
+	createBlockchainAddress := createBlockchainCmd.String("address", "", "The address to send genesis block reward to")
+	sendFrom := sendCmd.String("from", "", "Source wallet address")
+	sendTo := sendCmd.String("to", "", "Destination wallet address")
+	sendAmount := sendCmd.Int("amount", 0, "Amount to send")
+
+	switch os.Args[1] {
+	case "getbalance":
+		err := getBalanceCmd.Parse(os.Args[2:])
+		if err != nil {
+			log.Panic(err)
+		}
+	case "createblockchain":
+		err := createBlockchainCmd.Parse(os.Args[2:])
+		if err != nil {
+			log.Panic(err)
+		}
+	case "printchain":
+		err := printChainCmd.Parse(os.Args[2:])
+		if err != nil {
+			log.Panic(err)
+		}
+	case "send":
+		err := sendCmd.Parse(os.Args[2:])
+		if err != nil {
+			log.Panic(err)
+		}
+	default:
+		cli.printUsage()
+		runtime.Goexit()
+	}
+
+	if getBalanceCmd.Parsed() {
+		if *getBalanceAddress == "" {
+			getBalanceCmd.Usage()
+			runtime.Goexit()
+		}
+		cli.getBalance(*getBalanceAddress)
+	}
+
+	if createBlockchainCmd.Parsed() {
+		if *createBlockchainAddress == "" {
+			createBlockchainCmd.Usage()
+			runtime.Goexit()
+		}
+		cli.createBlockChain(*createBlockchainAddress)
+	}
+
+	if printChainCmd.Parsed() {
+		cli.printChain()
+	}
+
+	if sendCmd.Parsed() {
+		if *sendFrom == "" || *sendTo == "" || *sendAmount <= 0 {
+			sendCmd.Usage()
+			runtime.Goexit()
+		}
+
+		cli.send(*sendFrom, *sendTo, *sendAmount)
 	}
 }
 
-
-//Part 3 of Chapter 3: Fix up main func
 func main() {
-	defer os.Exit(0) //Give time to garbage collect the keys and values
-	chain := blockchain.InitBlockChain()
-	defer chain.Database.Close() //Properly close the database before the main func ends
-	//Defer only executes if the go channel is able to exit properly.That's why we're using runtime goexits rather than os.exit
-	//Add failsafe: Add defer os.Exit(0) at the top – done here
-
-	//Create the cli struct by passing in our blockchain
-
-	cli := CommandLine{chain}
+	defer os.Exit(0)
+	cli := CommandLine{}
 	cli.run()
-	}
+}
