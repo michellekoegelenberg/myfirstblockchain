@@ -3,6 +3,7 @@ package blockchain
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
 	"os"
 	"runtime"
 
@@ -47,7 +48,14 @@ func ContinueBlockChain(address string) *BlockChain {
 	//Run through the same as above
 	var lastHash []byte
 
-	db, err := badger.Open(badger.DefaultOptions("/tmp/badger")) //New BadgerDB API
+	// New Bader DB API
+
+	opt := badger.DefaultOptions(dbPath)
+	db, err := badger.Open(opt)
+	if err != nil {
+		log.Fatal(err)
+		fmt.Println("Continue Blockchain func error")
+	}
 
 	Handle(err)
 
@@ -55,11 +63,12 @@ func ContinueBlockChain(address string) *BlockChain {
 
 		item, err := txn.Get([]byte("lh"))
 		Handle(err)
-		err = item.Value(func(val []byte) error {
-			lastHash = append([]byte{}, val...)
-			return err
-		})
-		return nil
+		lastHash, err = item.ValueCopy(nil)
+		if err != nil {
+			log.Fatal(err)
+			fmt.Println("Value copy error")
+		}
+		return err
 	})
 
 	Handle(err)
@@ -76,21 +85,27 @@ func InitBlockChain(address string) *BlockChain {
 		runtime.Goexit() //exit the program
 	}
 
-	db, err := badger.Open(badger.DefaultOptions("/tmp/badger")) //New BadgerDB API
+	//New Bader DB API
+
+	opt := badger.DefaultOptions(dbPath)
+	db, err := badger.Open(opt)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	Handle(err)
 
 	err = db.Update(func(txn *badger.Txn) error {
-		cbtx := CoinbaseTx(address, genesisData)          //address will mine the Genesis block and get rewarded the 100 tokens
-		genesis := Genesis(cbtx)                          //Creating genesis block
-		fmt.Println("Genesis created/proved")             //Proving it
-		err := txn.Set(genesis.Hash, genesis.Serialize()) //Genesis hash is key for Genesis block, Serialize gen block
+		cbtx := CoinbaseTx(address, genesisData)         //address will mine the Genesis block and get rewarded the 100 tokens
+		genesis := Genesis(cbtx)                         //Creating genesis block
+		fmt.Println("Genesis created/proved")            //Proving it
+		err = txn.Set(genesis.Hash, genesis.Serialize()) //Genesis hash is key for Genesis block, Serialize gen block
 		Handle(err)
 		err = txn.Set([]byte("lh"), genesis.Hash)
 
 		lastHash = genesis.Hash
 
-		return nil
+		return err
 
 	})
 
@@ -116,10 +131,10 @@ func (chain *BlockChain) AddBlock(transactions []*Transaction) {
 
 		err = item.Value(func(val []byte) error {
 			lastHash = append([]byte{}, val...)
-			return err
+			return nil
 			//New code ends here
 		})
-		return nil
+		return err
 	})
 	Handle(err)
 	//Create a new block with the lastHash and the data we are passing in to the AddBlock func
