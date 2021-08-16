@@ -50,7 +50,10 @@ func (pow *ProofOfWork) InitData(nonce int) []byte {
 			pow.Block.HashTransactions(), //After this go to blockgain.go file to add constants
 			ToHex(int64(nonce)),
 			ToHex(int64(Difficulty)),
-		}, []byte{})
+		},
+		[]byte{},
+	)
+
 	return data
 }
 
